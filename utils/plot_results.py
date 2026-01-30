@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from itertools import cycle, batched
 
 import pandas as pd
