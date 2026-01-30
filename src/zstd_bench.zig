@@ -17,7 +17,7 @@ const FILE_LIMITS = 5 * GiB;
 const MIN_LEVEL = -7;
 const MAX_LEVEL = 19; // should be 22, but Zig does not support "ultra" compression
 
-/// Decompress ZSTD compressed bytes to out n times with libzstd.a and return total time elapsed in seconds
+/// Decompress ZSTD compressed bytes to out n times with C Zstd and return total time elapsed in seconds
 fn benchC(compressed: []const u8, out: []u8, n: usize) !f64 {
     var timer = try Timer.start();
 
@@ -29,7 +29,7 @@ fn benchC(compressed: []const u8, out: []u8, n: usize) !f64 {
     return @as(f64, @floatFromInt(elapsed_ns)) / time.ns_per_s;
 }
 
-/// Decompress ZSTD compressed bytes to out n times with zstd.zig and return total time elapsed in seconds
+/// Decompress ZSTD compressed bytes to out n times with Zig Zstd and return total time elapsed in seconds
 fn benchZig(compressed: []const u8, out: []u8, n: usize) !f64 {
     var timer = try Timer.start();
 
@@ -46,7 +46,7 @@ fn benchZig(compressed: []const u8, out: []u8, n: usize) !f64 {
 }
 
 fn intStrLessThan(_: void, lhs: []const u8, rhs: []const u8) bool {
-    // FIXME: I don't think this is the 
+    // FIXME: I don't think this is the right way to do things
     const left = std.fmt.parseInt(i8, lhs, 10) catch unreachable;
     const right = std.fmt.parseInt(i8, rhs, 10) catch unreachable;
     return left < right;
@@ -86,7 +86,7 @@ pub fn main() !void {
         allocator.free(levels);
     }
 
-    std.mem.sort([]const u8, levels, {}, intStrLessThan); // TODO: DO BETTER
+    std.mem.sort([]const u8, levels, {}, intStrLessThan);
 
     const csv_file = try std.fs.cwd().createFile(path_csv, .{ .truncate = true });
     defer csv_file.close();
@@ -117,7 +117,8 @@ pub fn main() !void {
 
             std.debug.print("Decompressing {s}:\n", .{full_path_comp});
 
-            const out_zig = try allocator.alloc(u8, FILE_LIMITS);
+            // Zig run
+            const out_zig = try allocator.alloc(u8, raw.len + zstd.block_size_max + zstd.default_window_len);
             defer allocator.free(out_zig);
             const elapsed_zig = try benchZig(compressed, out_zig, n_repeat);
 
@@ -126,9 +127,13 @@ pub fn main() !void {
                 std.process.exit(1);
             }
 
-            try csv_writer.interface.print("{s},{s},{s},{d},{d}\n", .{ "Zig", level, orig_file_name, n_repeat, elapsed_zig });
-            std.debug.print(" * Done in Zig for average {d:.3}s!\n", .{elapsed_zig / @as(f64, @floatFromInt(n_repeat))});
+            try csv_writer.interface.print("{s},{s},{s},{d},{d}\n",
+                                           .{ "Zig", level, orig_file_name, n_repeat, elapsed_zig });
 
+            std.debug.print(" * Done in Zig for average {d:.3}s!\n",
+                            .{elapsed_zig / @as(f64, @floatFromInt(n_repeat))});
+
+            // C run
             const out_c = try allocator.alloc(u8, raw.len);
             defer allocator.free(out_c);
             const elapsed_c = try benchC(compressed, out_c, n_repeat); // TODO: bench streaming
@@ -138,8 +143,11 @@ pub fn main() !void {
                 std.process.exit(1);
             }
 
-            try csv_writer.interface.print("{s},{s},{s},{d},{d}\n", .{ "C", level, orig_file_name, n_repeat, elapsed_c });
-            std.debug.print(" * Done in C for average {d:.3}s!\n", .{elapsed_c / @as(f64, @floatFromInt(n_repeat))});
+            try csv_writer.interface.print("{s},{s},{s},{d},{d}\n",
+                                           .{ "C", level, orig_file_name, n_repeat, elapsed_c });
+
+            std.debug.print(" * Done in C for average {d:.3}s!\n",
+                            .{elapsed_c / @as(f64, @floatFromInt(n_repeat))});
         }
         std.debug.print("\n", .{});
     }
@@ -170,4 +178,3 @@ test "C decompress" {
 
     try std.testing.expect(std.mem.eql(u8, raw, decomp));
 }
-
