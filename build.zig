@@ -1,7 +1,8 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const optimize = b.standardOptimizeOption(.{}); // Add optimize options to CLI
+    // const optimize = b.standardOptimizeOption(.{}); // Add optimize options to CLI
+    const optimize: std.builtin.OptimizeMode = .ReleaseFast;
     const target = b.standardTargetOptions(.{}); // Add target options to CLI
 
     var libzstd_mod = b.createModule(.{
@@ -44,6 +45,20 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(zstd_perf_exe);
 
+    const zstd_bench_file_exe = b.addExecutable(.{
+        .name = "zstd_bench_file",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/zstd_bench_file.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "libzstd", .module = libzstd_mod },
+            },
+        }),
+        // .use_llvm = true,
+    });
+    b.installArtifact(zstd_bench_file_exe);
+
     const run_exe = b.addRunArtifact(exe); // Create run step
     const run_step = b.step("run", "Run the application"); // Create new step in CLI called "run"
     run_step.dependOn(&run_exe.step); // Add actual run step into CLI's step
@@ -60,4 +75,19 @@ pub fn build(b: *std.Build) void {
     const run_tests = b.addRunArtifact(tests);
     const test_step = b.step("test", "Run the tests");
     test_step.dependOn(&run_tests.step);
+
+    // const root_mod = b.createModule(.{
+    //     .root_source_file = b.path("src/decode_literals.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // const exe = b.addExecutable(.{
+    //     .name = "main",
+    //     .root_module = root_mod,
+    // });
+    // b.installArtifact(exe);
+    // const run_exe = b.addRunArtifact(exe);
+    // const run_step = b.step("run", "Run the application");
+    // run_step.dependOn(&run_exe.step);
+
 }
