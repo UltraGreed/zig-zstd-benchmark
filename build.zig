@@ -25,16 +25,16 @@ pub fn build(b: *std.Build) void {
 
     // Create executable (compilation) step
     const exe = b.addExecutable(.{
-        .name = "main",
+        .name = "zstd_bench",
         .root_module = root_mod,
     });
 
     b.installArtifact(exe); // Actually install compiled unit
 
-    const single_exe = b.addExecutable(.{
-        .name = "zstd_single",
+    const zstd_perf_exe = b.addExecutable(.{
+        .name = "zstd_perf",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/zstd_single.zig"),
+            .root_source_file = b.path("src/zstd_perf.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -42,7 +42,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(single_exe);
+    b.installArtifact(zstd_perf_exe);
 
     const run_exe = b.addRunArtifact(exe); // Create run step
     const run_step = b.step("run", "Run the application"); // Create new step in CLI called "run"
